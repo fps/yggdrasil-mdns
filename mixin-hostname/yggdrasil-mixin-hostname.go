@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/ed25519"
-	// "encoding/base32"
+	"encoding/base32"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -94,11 +94,12 @@ func main() {
 
     log.Println("Mixed in keys:")
     log.Println("Private:", hex.EncodeToString(mixedInPrivateKey))
-    log.Println("Public:", hex.EncodeToString(mixedInPrivateKey.Public().(ed25519.PublicKey)))
+    log.Println("Public:", hex.EncodeToString(mixedInPublicKey))
 
     address := address.AddrForKey(mixedInPublicKey)
     bytes := [16]byte(*address)
 
     log.Println("Address:", net.IP(bytes[:]).String())
+    log.Println("Address (base32):", base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(mixedInPublicKey))
 }
 
