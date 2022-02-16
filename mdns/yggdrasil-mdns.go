@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"github.com/fps/yggdrasil-mdns/util"
 	"github.com/hjson/hjson-go"
 	"github.com/kardianos/minwinsvc"
 	"github.com/libp2p/go-reuseport"
@@ -17,7 +18,6 @@ import (
 	"net"
 	"os"
 	"strings"
-    "github.com/fps/yggdrasil-mdns/util"
 )
 
 type args struct {

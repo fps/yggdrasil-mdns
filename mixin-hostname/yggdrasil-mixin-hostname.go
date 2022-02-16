@@ -13,15 +13,15 @@ import (
 	"net"
 	"os"
 	// "strings"
-    "github.com/fps/yggdrasil-mdns/util"
+	"github.com/fps/yggdrasil-mdns/util"
 )
 
 type args struct {
-	useconffile    string
+	useconffile string
 	// hostnamesuffix string
 	// keysuffix      string
-	logto          string
-	hostname       string
+	logto    string
+	hostname string
 }
 
 func getArgs() args {
@@ -30,21 +30,21 @@ func getArgs() args {
 	// keysuffix := flag.String("keysuffix", "-yggk.local.", "the keysuffix to answer for - make sure it ends with a dot, e.g.: \"-yggk.local.\"")
 	logto := flag.String("logto", "stdout", "where to log")
 
-    default_hostname, err := os.Hostname()
-    if err != nil {
-        log.Println("Failed to retrieve hostname. Setting to \"\"")
-        default_hostname = ""
-    }
+	default_hostname, err := os.Hostname()
+	if err != nil {
+		log.Println("Failed to retrieve hostname. Setting to \"\"")
+		default_hostname = ""
+	}
 
-    hostname := flag.String("hostname", default_hostname, "the hostname to mix in")
+	hostname := flag.String("hostname", default_hostname, "the hostname to mix in")
 
 	flag.Parse()
 	return args{
-		useconffile:    *useconffile,
+		useconffile: *useconffile,
 		// hostnamesuffix: *hostnamesuffix,
 		// keysuffix:      *keysuffix,
-		logto:          *logto,
-        hostname:       *hostname,
+		logto:    *logto,
+		hostname: *hostname,
 	}
 }
 
@@ -76,30 +76,29 @@ func main() {
 	}
 
 	sigPriv, err := hex.DecodeString(cfg["PrivateKey"].(string))
-    if err != nil {
-        log.Println("Failed to decode private key", err)
-        return
-    }
+	if err != nil {
+		log.Println("Failed to decode private key", err)
+		return
+	}
 
 	privateKey := ed25519.PrivateKey(sigPriv)
 
-    hostname, err := os.Hostname()
-    if err != nil {
-        log.Println("Failed to retrieve hostname", err)
-        return
-    }
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Println("Failed to retrieve hostname", err)
+		return
+	}
 
-    mixedInPrivateKey := util.MixinHostname(privateKey, hostname)
-    mixedInPublicKey := mixedInPrivateKey.Public().(ed25519.PublicKey)
+	mixedInPrivateKey := util.MixinHostname(privateKey, hostname)
+	mixedInPublicKey := mixedInPrivateKey.Public().(ed25519.PublicKey)
 
-    log.Println("Mixed in keys:")
-    log.Println("Private:", hex.EncodeToString(mixedInPrivateKey))
-    log.Println("Public:", hex.EncodeToString(mixedInPublicKey))
+	log.Println("Mixed in keys:")
+	log.Println("Private:", hex.EncodeToString(mixedInPrivateKey))
+	log.Println("Public:", hex.EncodeToString(mixedInPublicKey))
 
-    address := address.AddrForKey(mixedInPublicKey)
-    bytes := [16]byte(*address)
+	address := address.AddrForKey(mixedInPublicKey)
+	bytes := [16]byte(*address)
 
-    log.Println("Address:", net.IP(bytes[:]).String())
-    log.Println("Address (base32):", base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(mixedInPublicKey))
+	log.Println("Address:", net.IP(bytes[:]).String())
+	log.Println("Address (base32):", base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(mixedInPublicKey))
 }
-
