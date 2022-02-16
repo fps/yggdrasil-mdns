@@ -2,143 +2,50 @@ package main
 
 import (
 	"crypto/ed25519"
-	"encoding/base32"
+	// "encoding/base32"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/hjson/hjson-go"
-	"github.com/libp2p/go-reuseport"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
-	"golang.org/x/net/dns/dnsmessage"
-	"golang.org/x/net/ipv6"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
-	"strings"
+	// "strings"
     "github.com/fps/yggdrasil-mdns/util"
 )
 
 type args struct {
 	useconffile    string
-	hostnamesuffix string
-	keysuffix      string
+	// hostnamesuffix string
+	// keysuffix      string
+	logto          string
+	hostname       string
 }
 
 func getArgs() args {
 	useconffile := flag.String("useconffile", "conf", "config file to read the private key from")
-	port := flag.Int("port", 5353, "port to listen on (UDP)")
-	hostnamesuffix := flag.String("hostnamesuffix", "-ygg.local.", "the hostnamesuffix to answer for - make sure it ends with a dot, e.g.: \"-ygg.local.\"")
-	keysuffix := flag.String("keysuffix", "-yggk.local.", "the keysuffix to answer for - make sure it ends with a dot, e.g.: \"-yggk.local.\"")
+	// hostnamesuffix := flag.String("hostnamesuffix", "-ygg.local.", "the hostnamesuffix to answer for - make sure it ends with a dot, e.g.: \"-ygg.local.\"")
+	// keysuffix := flag.String("keysuffix", "-yggk.local.", "the keysuffix to answer for - make sure it ends with a dot, e.g.: \"-yggk.local.\"")
+	logto := flag.String("logto", "stdout", "where to log")
+
+    default_hostname, err := os.Hostname()
+    if err != nil {
+        log.Println("Failed to retrieve hostname. Setting to \"\"")
+        default_hostname = ""
+    }
+
+    hostname := flag.String("hostname", default_hostname, "the hostname to mix in")
 
 	flag.Parse()
 	return args{
 		useconffile:    *useconffile,
-		hostnamesuffix: *hostnamesuffix,
-		keysuffix:      *keysuffix,
+		// hostnamesuffix: *hostnamesuffix,
+		// keysuffix:      *keysuffix,
+		logto:          *logto,
+        hostname:       *hostname,
 	}
-}
-
-var privateKey []byte
-var hostnamesuffix string
-var keysuffix string
-
-func processHostnameQuery(q dnsmessage.Question, msg dnsmessage.Message) ([]byte, error) {
-	trimmed := strings.TrimSuffix(q.Name.String(), hostnamesuffix)
-	log.Println("Network be asking for:", q.Name.String(), "Trimmed:", trimmed, "Suffix: ", hostnamesuffix)
-	mixedPriv := util.MixinHostname(ed25519.PrivateKey(privateKey), trimmed)
-	resolved := address.AddrForKey(mixedPriv.Public().(ed25519.PublicKey))
-
-	rsp := dnsmessage.Message{
-		Header:    dnsmessage.Header{ID: msg.Header.ID, Response: true, Authoritative: true},
-		Questions: []dnsmessage.Question{},
-		Answers: []dnsmessage.Resource{
-			{
-				Header: dnsmessage.ResourceHeader{
-					Name:  q.Name,
-					Type:  dnsmessage.TypeAAAA,
-					Class: dnsmessage.ClassINET,
-					TTL:   10,
-				},
-				Body: &dnsmessage.AAAAResource{AAAA: *resolved},
-			},
-		},
-	}
-
-	rspbuf, err := rsp.Pack()
-	if err != nil {
-		log.Println("Error packing: ", err)
-		return nil, err
-	}
-
-	return rspbuf, nil
-}
-
-func processKeyQuery(q dnsmessage.Question, msg dnsmessage.Message) ([]byte, error) {
-	trimmed := strings.TrimSuffix(q.Name.String(), keysuffix)
-	log.Println("Network be asking for:", q.Name.String(), "Trimmed:", trimmed, "Suffix: ", keysuffix)
-
-	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(trimmed)
-	if err != nil {
-		log.Println("Error decoding key:", err)
-		return nil, err
-	}
-
-	resolved := address.AddrForKey(key)
-
-	rsp := dnsmessage.Message{
-		Header:    dnsmessage.Header{ID: msg.Header.ID, Response: true, Authoritative: true},
-		Questions: []dnsmessage.Question{},
-		Answers: []dnsmessage.Resource{
-			{
-				Header: dnsmessage.ResourceHeader{
-					Name:  q.Name,
-					Type:  dnsmessage.TypeAAAA,
-					Class: dnsmessage.ClassINET,
-					TTL:   10,
-				},
-				Body: &dnsmessage.AAAAResource{AAAA: *resolved},
-			},
-		},
-	}
-
-	rspbuf, err := rsp.Pack()
-	if err != nil {
-		log.Println("Error packing: ", err)
-		return nil, err
-	}
-
-	return rspbuf, nil
-}
-
-func processQuery(msg dnsmessage.Message, remote *net.UDPAddr, srvaddr string) ([]byte, error) {
-	for _, q := range msg.Questions {
-		if q.Type != dnsmessage.TypeAAAA {
-			continue
-		}
-
-		var rsp []byte = nil
-		var err error = nil
-
-		if strings.HasSuffix(q.Name.String(), hostnamesuffix) {
-			rsp, err = processHostnameQuery(q, msg)
-			if err != nil {
-				log.Println("Error processing hostname query:", err)
-				return nil, err
-			}
-			return rsp, nil
-		}
-
-		if strings.HasSuffix(q.Name.String(), keysuffix) {
-			rsp, err = processKeyQuery(q, msg)
-			if err != nil {
-				log.Println("Error processing key query:", err)
-				return nil, err
-			}
-			return rsp, nil
-		}
-	}
-	return nil, fmt.Errorf("No question in query")
 }
 
 func main() {
@@ -168,9 +75,30 @@ func main() {
 		return
 	}
 
-	sigPriv, _ := hex.DecodeString(cfg["PrivateKey"].(string))
-	privateKey = sigPriv
-	hostnamesuffix = args.hostnamesuffix
-	keysuffix = args.keysuffix
+	sigPriv, err := hex.DecodeString(cfg["PrivateKey"].(string))
+    if err != nil {
+        log.Println("Failed to decode private key", err)
+        return
+    }
 
+	privateKey := ed25519.PrivateKey(sigPriv)
+
+    hostname, err := os.Hostname()
+    if err != nil {
+        log.Println("Failed to retrieve hostname", err)
+        return
+    }
+
+    mixedInPrivateKey := util.MixinHostname(privateKey, hostname)
+    mixedInPublicKey := mixedInPrivateKey.Public().(ed25519.PublicKey)
+
+    log.Println("Mixed in keys:")
+    log.Println("Private:", hex.EncodeToString(mixedInPrivateKey))
+    log.Println("Public:", hex.EncodeToString(mixedInPrivateKey.Public().(ed25519.PublicKey)))
+
+    address := address.AddrForKey(mixedInPublicKey)
+    bytes := [16]byte(*address)
+
+    log.Println("Address:", net.IP(bytes[:]).String())
 }
+
